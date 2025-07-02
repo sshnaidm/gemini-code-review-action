@@ -1,0 +1,133 @@
+# action.yaml
+name: 'Gemini Code review Github Action'
+author: Sagi (Sergey) Shnaidman (@sshnaidm)
+description: 'A Github Action that posts code review from Gemini to pull request'
+inputs:
+  github-token:
+    description: 'The token used to authenticate with the GitHub API'
+    required: false
+    default: ${{ github.token }} #${{ secrets.GITHUB_TOKEN }}
+  model:
+    description: 'The Gemini language model to use for code review'
+    required: false
+    default: 'gemini-2.5-flash'
+  gemini-key:
+    description: 'The Gemini API key'
+    required: true
+  prompt:
+    description: 'The prompt to use for the analysis.'
+    required: false
+    default: ''
+  thinking:
+    description: 'The thinking mode for Gemini'
+    required: false
+    default: ''  # dynamic, off, or number of tokens
+  temperature:
+    description: 'The temperature for Gemini'
+    required: false
+    default: '0.0'  # 0.0 is recommended for code review
+  top-p:
+    description: 'The top_p value for Gemini'
+    required: false
+    default: '0.0'  # 0.0 is recommended for code review
+  max-output:
+    description: 'Limit the length of the output to a certain number of tokens. If set to an empty string, there is no limit.'
+    required: false
+    default: '' # empty means no limit
+  context-lines:
+    description: 'Number of context lines to include in the diff'
+    required: false
+    default: '10'
+  add-files:
+    description: 'Whether to include additional context files in the AI review. If set to `"true"`, all changed files will be sent to the AI.'
+    required: false
+    default: 'false'
+  post-if-error:
+    description: 'Whether to post a comment if there was an error'
+    required: false
+    default: 'true'
+  review-title:
+    description: 'The title of the review'
+    required: false
+    default: '# Code Review by Gemini'
+
+outputs:
+  results:
+    description: 'The results of the code review'
+    value: ${{ steps.gemini.outputs.reviewresult }}
+
+runs:
+  using: 'composite'
+  steps:
+
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
+
+    - name: Install Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install Dependencies
+      run: |
+        pip install --upgrade pip setuptools wheel
+        pip install -r ${{ github.action_path }}/requirements.txt --verbose
+      shell: bash
+
+    - name: Run Gemini code review
+      id: gemini
+      run: |
+        git diff -U${CONTEXT_LINES} ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} > code_review.diff
+        if [ -n "$AI_REVIEW_PROMPT" ]; then
+          echo "$AI_REVIEW_PROMPT" > ai_review_prompt.txt
+          SCRIPT_ARGS="$SCRIPT_ARGS --prompt-file ai_review_prompt.txt"
+        fi
+        CONTEXT_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | tr '\n' ',' | sed 's/,$//')
+        if [ -n "$CONTEXT_FILES" ] && [ "$AI_ADD_FILES" = "true" ]; then
+          SCRIPT_ARGS="$SCRIPT_ARGS --context-files $CONTEXT_FILES"
+        fi
+        echo "$REVIEW_TITLE" > review.txt
+        python ${{ github.action_path }}/gemini-review.py --diff-file code_review.diff $SCRIPT_ARGS >> review.txt
+        echo 'reviewresult<<EOF' >> $GITHUB_OUTPUT
+        echo "$(cat review.txt)" >> $GITHUB_OUTPUT
+        echo 'EOF' >> $GITHUB_OUTPUT
+      shell: bash
+      env:
+        GEMINI_API_KEY: ${{ inputs.gemini-key }}
+        MODEL: ${{ inputs.model }}
+        MAX_OUTPUT: ${{ inputs.max-output }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        COMMIT_TITLE: ${{ github.event.pull_request.title }}
+        COMMIT_BODY: ${{ github.event.pull_request.body }}
+        REVIEW_TITLE: ${{ inputs.review-title }}
+        AI_REVIEW_PROMPT: ${{ inputs.prompt }}
+        CONTEXT_LINES: ${{ inputs.context-lines }}
+        AI_ADD_FILES: ${{ inputs.add-files }}
+        THINKING: ${{ inputs.thinking }}
+        TEMPERATURE: ${{ inputs.temperature }}
+        TOP_P: ${{ inputs.top-p }}
+
+    - name: Show output in case of failure
+      id: err-output
+      if: failure()
+      run: |
+        echo 'errorresult<<EOF' >> $GITHUB_OUTPUT
+        echo "ERROR: $(cat review.txt)" >> $GITHUB_OUTPUT
+        echo 'EOF' >> $GITHUB_OUTPUT
+        echo "Review result and error: $(cat review.txt)"
+      shell: bash
+
+    - name: Create comment
+      if: success() || (inputs.post-if-error && inputs.post-if-error != 'false')
+      uses: peter-evans/create-or-update-comment@v3
+      with:
+        issue-number: ${{ github.event.pull_request.number }}
+        body: |
+          ${{ steps.gemini.outputs.reviewresult && steps.gemini.outputs.reviewresult || steps.err-output.outputs.errorresult }}
+        reactions: '+1'
+
+branding:
+  icon: 'user-check'
+  color: 'green'
