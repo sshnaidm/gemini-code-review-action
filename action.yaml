@@ -72,7 +72,7 @@ runs:
 
     - name: Install Dependencies
       run: |
-        pip install --upgrade pip setuptools wheel
+        pip install --upgrade pip wheel
         pip install -r ${{ github.action_path }}/requirements.txt --verbose
       shell: bash
 
