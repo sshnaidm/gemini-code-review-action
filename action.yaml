@@ -10,7 +10,7 @@ inputs:
   model:
     description: 'The Gemini language model to use for code review'
     required: false
-    default: 'gemini-2.5-flash'
+    default: 'gemini-2.5-pro'
   gemini-key:
     description: 'The Gemini API key'
     required: true

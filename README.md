@@ -44,7 +44,7 @@ jobs:
 | `gemini-key` | Gemini API key | Yes | - |
 | `github-token` | GitHub token for API authentication | No | `${{ github.token }}` |
 | `prompt` | Custom prompt for the AI review | No | Default review prompt |
-| `model` | The Gemini language model to use for code review | No | `gemini-2.5-flash` |
+| `model` | The Gemini language model to use for code review | No | `gemini-2.5-pro` |
 | `thinking` | The thinking mode for Gemini. Can be `dynamic`, `off` or tokens number. | No | - |
 | `temperature` | The temperature for Gemini | No | `0.0` |
 | `top-p` | The top_p value for Gemini | No | `0.0` |
