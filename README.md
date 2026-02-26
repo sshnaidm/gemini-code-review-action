@@ -27,7 +27,7 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
-      - uses: sshnaidm/gemini-code-review-action@v1
+      - uses: sshnaidm/gemini-code-review-action@v2
         with:
           gemini-key: ${{ secrets.GEMINI_API_KEY }}
 ```
@@ -59,7 +59,7 @@ jobs:
 ### Custom Review Prompt
 
 ```yaml
-- uses: sshnaidm/gemini-code-review-action@v1
+- uses: sshnaidm/gemini-code-review-action@v2
   with:
     gemini-key: ${{ secrets.GEMINI_API_KEY }}
     prompt: |
@@ -72,7 +72,7 @@ jobs:
 ### Include Additional Context
 
 ```yaml
-- uses: sshnaidm/gemini-code-review-action@v1
+- uses: sshnaidm/gemini-code-review-action@v2
   with:
     gemini-key: ${{ secrets.GEMINI_API_KEY }}
     add-files: 'true'
